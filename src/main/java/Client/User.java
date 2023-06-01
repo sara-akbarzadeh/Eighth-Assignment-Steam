@@ -5,6 +5,7 @@ import org.json.JSONObject;
 public class User {
     private String username;
     private int age;
+    private String password;
 
     public User(JSONObject response) {
         this.username = response.getString("username");
@@ -31,4 +32,13 @@ public class User {
         json.put("username", this.username);
         return json;
     }
+    public String getPassword(){
+        return password;
+    }
+
+    public void setPassword(String password){
+        this.password = password;
+    }
+
+
 }

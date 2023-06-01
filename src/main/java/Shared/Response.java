@@ -1,151 +1,95 @@
 package Shared;
-import Server.InsertData;
+
 import org.json.JSONObject;
+import java.io.File;
+import java.io.Serializable;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
 
-public class Response {
-    public static String responseCreator(JSONObject request,Statement statement) throws SQLException {
-        String type = request.getString("type");
+public class Response implements Serializable {
+    private File file;
+    private JSONObject jsonObj;
+    private String json;
+    private String message;
 
-        if (type.equals("lobby menu")){
-            return lobbyMenuResponse();
-        }
-
-        else if (type.equals("user menu")){
-            return userMenuResponse(request);
-        }
-
-        else if(type.equals("sign up")){
-            return signUpResponseCreator(doesUserExist(request,statement),statement,request);
-        }
-
-        else if (type.equals("log in")){
-            return logInResponseCreator(doesUserExist(request,statement),statement,request);
-        }
-
-        else if (type.equals("view games")){
-            return viewGameListResponse(statement, request);
-        }
-
-        return null;
+    public Response(String json) {
+        this.json = json;
     }
 
-    private static String viewGameListResponse(Statement statement, JSONObject request) throws SQLException {
-        JSONObject json = new JSONObject();
-
-        json.put("type", "view game list");
-        json.put("user",request.getJSONObject("user"));
-        ArrayList<String> columns = columnNames(statement);
-        System.out.println(columns);
-
-        ResultSet result = statement.executeQuery("SELECT * FROM games");
-        result.next();
-
-        JSONObject games = new JSONObject();
-
-        while (!result.isAfterLast()){
-            JSONObject details = new JSONObject();
-            for (int j=0;j<8;j++){
-                String column = columns.get(j);
-                details.put(column,result.getString(column));
-            }
-            System.out.println(details);
-            games.put(result.getString("id"),details);
-            result.next();
-        }
-        json.put("games",games);
-
-        System.out.println(json.toString());
-
-        return json.toString();
+    public File getFile() {
+        return file;
     }
 
-    private static String logInResponseCreator(String doesUserExist, Statement statement, JSONObject request) throws SQLException {
-        JSONObject json = new JSONObject();
-        json.put("type", "log in");
-        json.put("username",request.getString("username"));
+    public void setFile(File file) {
+        this.file = file;
+    }
 
-        if (doesUserExist.equals("true")){
-            ResultSet result = statement.executeQuery("SELECT * FROM users WHERE username = '" + request.getString("username") + "'");
-            result.next();
-            if (result.getString("password").equals(request.getString("password"))){
+    public JSONObject getJsonObj() {
+        return jsonObj;
+    }
+
+    public void setJsonObj(JSONObject jsonObj) {
+        this.jsonObj = jsonObj;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
+    }
+
+    public String getJson() {
+        return json;
+    }
+
+    public void setJson(String json) {
+        this.json = json;
+    }
+
+    public static JSONObject Login(JSONObject json) throws SQLException {
+        String username = json.getString("username");
+        String password = json.getString("password");
+        DataBase DB = new DataBase();
+        ResultSet resultSet = (DB.query("SELECT * FROM \"Steam\".\"accounts\""));
+        while (resultSet.next()) {
+            if (resultSet.getString("Username").equals(username) && resultSet.getString("Password").equals(password)) {
                 json.put("status", "true");
+                return json;
             }
+        }
+        json.put("status", "false");
+        return json;
+    }
 
-            else{
+    public static JSONObject SignUp(JSONObject json) throws SQLException {
+        String username = json.getString("username");
+        String password = json.getString("password");
+        DataBase DB = new DataBase();
+        ResultSet resultSet = (DB.query("SELECT * FROM \"Steam\".\"accounts\""));
+        while (resultSet.next()) {
+            if (resultSet.getString("Username").equals(username)) {
                 json.put("status", "false");
-                json.put("reason","password is incorrect");
+                return json;
             }
         }
+        json.put("status", "true");
+        String ID = "2";
+        String sql = "INSERT INTO \"Steam\".\"accounts\" VALUES ('" + ID + "','" + username + "', '" +
+                password + "','" + json.getString("Birthday") + "')";
 
-        else{
-            json.put("status", "false");
-            json.put("reason","no user found with such username");
-        }
-
-        return json.toString();
+        DB.query(sql);
+        return json;
     }
 
-    public static String lobbyMenuResponse(){
-        JSONObject json = new JSONObject();
+    public static void Downloaded(String json, String gameId) {
+        JSONObject jObj = new JSONObject(json);
+        DataBase DB = new DataBase();
+        String sql = "INSERT INTO \"Steam\".\"Downloads\" VALUES ('" +
+                jObj.getString("username") + "','" + gameId + "', '" +
+                '1' + "')";
 
-        json.put("type","lobby menu");
-
-        return json.toString();
-    }
-
-    public static String userMenuResponse(JSONObject request){
-        JSONObject json = new JSONObject();
-
-        json.put("type","user menu");
-        json.put("username",request.getString("username"));
-
-        return json.toString();
-    }
-
-    public static String signUpResponseCreator(String doesUserExist, Statement statement,JSONObject json) throws SQLException {
-        if (doesUserExist.equals("false")){
-            InsertData.insertUser(json,statement);
-        }
-
-        json.put("type","sign up");
-
-        if (doesUserExist.equals("false")) {
-            json.put("status", "true");
-        }
-
-        else{
-            json.put("status", "false");
-        }
-
-        return json.toString();
-    }
-
-    public static String doesUserExist(JSONObject json,Statement statement) throws SQLException {
-        ResultSet result = statement.executeQuery("SELECT COUNT(*) FROM users WHERE username = '" +
-                json.getString("username") + "'");
-        result.next();
-
-        if (result.getInt("count") == 0){
-            return "false";
-        }
-        return "true";
-    }
-
-    public static ArrayList<String> columnNames(Statement statement) throws SQLException {
-        ArrayList<String> columns = new ArrayList<>();
-
-        for (int i=2;i<=9;i++) {
-            String sql = "SELECT column_name FROM information_schema.columns\n" +
-                    "WHERE table_name = '" + "games" + "' AND ordinal_position = " + i + ";";
-            ResultSet result = statement.executeQuery(sql);
-            result.next();
-            columns.add(result.getString("column_name"));
-        }
-
-        return columns;
+        DB.query(sql);
     }
 }
